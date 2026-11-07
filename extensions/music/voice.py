@@ -77,5 +77,8 @@ async def handle(conn, text):
     except (aiohttp.ClientError, ValueError, TimeoutError):
         reply = '音乐服务暂时没有响应，请稍后再试'
     conn.logger.bind(tag='local_music').info(f'本地音乐指令 action={command["action"]}，跳过模型')
-    await clear_command._speak(conn, text, reply)
+    # End this turn after the confirmation audio; the next command needs a fresh wake.
+    conn.close_after_chat = True
+    if not await clear_command._speak(conn, text, reply):
+        await conn.close()
     return True
