@@ -1,0 +1,18 @@
+[Unit]
+Description=ThinkSmart QQ Music account verification
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/thinksmart/extensions/music
+Environment=HOME=/home/ubuntu PYTHONUNBUFFERED=1
+UMask=0077
+ExecStart=/home/ubuntu/thinksmart-music/venv/bin/python /opt/thinksmart/extensions/music/server.py
+ExecStartPost=/usr/bin/timeout 45 /bin/sh -c 'until /usr/bin/curl -fsS http://127.0.0.1:8091/api/status >/dev/null 2>&1; do sleep 1; done'
+TimeoutStartSec=60
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
