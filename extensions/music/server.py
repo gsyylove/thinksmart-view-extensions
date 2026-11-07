@@ -150,6 +150,39 @@ async def create_app():
                            'membership': bool(song.pay.pay_month or song.pay.pay_play)})
         return web.json_response({'songs': output, 'total': result.total, 'page': page})
 
+    async def feed(request):
+        kind = request.query.get('kind', 'hot')
+        if kind not in {'hot', 'recommend'}:
+            raise web.HTTPBadRequest()
+        if not client.credential.musicid:
+            return web.json_response({'error': '请先扫码登录音乐账号'}, status=401)
+
+        async def fetch_feed():
+            if kind == 'recommend':
+                result = await client.recommend.get_guess_recommend()
+                return result.songs, '猜你喜欢'
+            categories = await client.top.get_category()
+            chart = next((item for group in categories.group for item in group.toplist
+                          if item.name == '热歌榜'), None)
+            if chart is None:
+                raise ValueError('Hot chart unavailable')
+            result = await client.top.get_detail(chart.id, num=100, page=1)
+            return result.songs, chart.name
+
+        selected, title = await asyncio.wait_for(fetch_feed(), 25)
+        output = []
+        seen = set()
+        for song in selected:
+            if not song.mid or song.mid in seen:
+                continue
+            seen.add(song.mid)
+            songs[song.mid] = song
+            output.append({'mid': song.mid, 'title': song.title or song.name,
+                           'singer': ' / '.join(item.name for item in song.singer), 'duration': song.interval})
+        if not output:
+            return web.json_response({'error': '暂时没有获取到歌曲，请稍后重试'}, status=502)
+        return web.json_response({'songs': output, 'title': title})
+
     async def play_url(request):
         body = await request.json()
         mid = body.get('mid', '')
@@ -246,7 +279,7 @@ async def create_app():
         nonlocal command_number
         body = await request.json()
         action = body.get('action')
-        if action not in {'open', 'play', 'pause', 'resume', 'stop', 'next', 'previous', 'search'}:
+        if action not in {'open', 'play', 'pause', 'resume', 'stop', 'next', 'previous', 'search', 'hot', 'shuffle', 'playlist', 'recommend'}:
             raise web.HTTPBadRequest()
         if time.monotonic() - browser_seen > 5:
             return web.json_response({'ok': False, 'message': '音乐页面还没连接，请先打开设备首页'})
@@ -254,7 +287,7 @@ async def create_app():
             command_number += 1
             key = f'{time.time_ns()}-{command_number}'
             future = asyncio.get_running_loop().create_future()
-            timeout = 75 if action == 'search' else 30
+            timeout = 75 if action in {'search', 'play', 'hot', 'shuffle', 'playlist', 'recommend'} else 30
             command = {'id': key, 'action': action, 'expires': time.time() + timeout}
             if action == 'search':
                 for name in ('query', 'title', 'singer'):
@@ -282,6 +315,7 @@ async def create_app():
     app.router.add_get('/api/status', status)
     app.router.add_get('/api/playlists', playlists)
     app.router.add_get('/api/songs', song_list)
+    app.router.add_get('/api/feed', feed)
     app.router.add_post('/api/play', play_url)
     app.router.add_get('/api/lyrics', lyrics)
     app.router.add_post('/api/search', search)

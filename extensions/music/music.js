@@ -228,11 +228,7 @@
   }
   previous.addEventListener('click', () => loadSongs(page - 1));
   next.addEventListener('click', () => loadSongs(page + 1));
-  async function startMusic() {
-    if (audio.getAttribute('src')) {
-      await audio.play();
-      return '继续播放';
-    }
+  async function startPlaylist() {
     const lists = await call('/api/playlists');
     const selected = lists.playlists.find(item => item.count > 0);
     if (!selected) throw new Error('账号里还没有可播放的歌单');
@@ -247,13 +243,40 @@
     if (!await play(queue[0])) throw new Error('这首歌曲暂时无法播放，请在音乐页面选择其他歌曲');
     return '开始播放音乐';
   }
+  async function startFeed(kind) {
+    status.textContent = kind === 'recommend' ? '正在获取猜你喜欢' : '正在获取热歌榜';
+    const data = await call(`/api/feed?kind=${kind === 'recommend' ? 'recommend' : 'hot'}`);
+    const selected = [...data.songs];
+    if (kind === 'shuffle') {
+      for (let i = selected.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [selected[i], selected[j]] = [selected[j], selected[i]];
+      }
+    }
+    if (!selected.length) throw new Error('暂时没有获取到歌曲');
+    queueSource = 'feed';
+    queue = selected;
+    queuePlaylist = null;
+    queuePage = 1;
+    queueTotal = selected.length;
+    queueIndex = 0;
+    if (!await play(queue[0])) throw new Error('这首歌曲暂时无法播放，请说下一首');
+    return kind === 'shuffle' ? '开始随机播放热歌榜' : `开始播放${data.title}`;
+  }
+  async function resumeMusic() {
+    if (!audio.getAttribute('src')) return startFeed('shuffle');
+    await audio.play();
+    document.body.classList.add('music-mode');
+    return '继续播放';
+  }
+  audio.addEventListener('ended', () => stepMusic(1).catch(error => {track.textContent = error.message;}));
   async function stepMusic(direction) {
-    if (queueSource === 'search' && queue.length) {
+    if ((queueSource === 'search' || queueSource === 'feed') && queue.length) {
       queueIndex = (queueIndex + direction + queue.length) % queue.length;
       if (!await play(queue[queueIndex])) throw new Error('这首歌曲暂时无法播放，请换一首');
       return direction > 0 ? '已切换下一首' : '已切换上一首';
     }
-    if (!queuePlaylist || !queue.length) return startMusic();
+    if (!queuePlaylist || !queue.length) return startFeed('shuffle');
     const absolute = ((queuePage - 1) * 30 + queueIndex + direction + queueTotal) % queueTotal;
     const targetPage = Math.floor(absolute / 30) + 1;
     const targetIndex = absolute % 30;
@@ -319,7 +342,10 @@
       }
       return action === 'pause' ? '音乐已暂停' : '音乐已停止';
     }
-    if (action === 'play' || action === 'resume') return startMusic();
+    if (action === 'play' || action === 'shuffle') return startFeed('shuffle');
+    if (action === 'hot' || action === 'recommend') return startFeed(action);
+    if (action === 'playlist') return startPlaylist();
+    if (action === 'resume') return resumeMusic();
     return stepMusic(action === 'next' ? 1 : -1);
   }
   async function checkCommands() {

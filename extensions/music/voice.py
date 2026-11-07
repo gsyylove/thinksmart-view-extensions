@@ -8,6 +8,12 @@ import aiohttp
 COMMANDS = {
     '打开音乐': 'open', '打开播放器': 'open', '打开音乐播放器': 'open', '打开QQ音乐': 'open',
     '播放音乐': 'play', '放音乐': 'play', '放首歌': 'play', '放一首歌': 'play', '播放歌曲': 'play',
+    '播放热门音乐': 'hot', '播放热门歌曲': 'hot', '播放热歌榜': 'hot', '播放热歌': 'hot',
+    '播放随机音乐': 'shuffle', '我想听随机音乐': 'shuffle', '随机播放歌曲': 'shuffle',
+    '随机播放音乐': 'shuffle', '随机播放': 'shuffle', '随机放歌': 'shuffle',
+    '随便放点歌': 'shuffle', '随便放首歌': 'shuffle', '随便放一首歌': 'shuffle',
+    '播放我的歌单': 'playlist', '播放歌单': 'playlist',
+    '播放推荐音乐': 'recommend', '播放推荐歌曲': 'recommend', '播放猜你喜欢': 'recommend',
     '暂停': 'pause', '暂停音乐': 'pause', '暂停播放': 'pause',
     '继续': 'resume', '继续音乐': 'resume', '继续播放': 'resume', '继续播放音乐': 'resume',
     '停止音乐': 'stop', '停止播放音乐': 'stop', '停止播放': 'stop',
