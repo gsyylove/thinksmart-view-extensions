@@ -2,6 +2,7 @@
 import asyncio
 import json
 import math
+from html import unescape
 from datetime import datetime, timedelta
 import re
 import time
@@ -10,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from aiohttp import ClientError, ClientSession, ClientTimeout, web
 
+IP138_SOURCE = 'https://2026.ip138.com/'
 LOCATION_SOURCE = 'https://r.inews.qq.com/api/ip2city'
 SEARCH_SOURCE = 'https://toy1.weather.com.cn/search'
 
@@ -18,7 +20,7 @@ def place_name(value):
     return re.sub(r'(?:特别行政区|壮族自治区|回族自治区|维吾尔自治区|自治区|自治州|地区|省|市|区|县)$', '', value.strip())
 
 
-def parse_city(text, city, province):
+def parse_city(text, city, province, parent_code=None):
     match = re.fullmatch(r'\s*weather\((.*)\)\s*;?\s*', text, re.S)
     if not match or not match[1]:
         raise ValueError('City lookup unavailable')
@@ -27,24 +29,65 @@ def parse_city(text, city, province):
         parts = item.get('ref', '').split('~')
         if len(parts) < 10 or not re.fullmatch(r'101[0-9]{6}', parts[0]):
             continue
-        if place_name(parts[2]) == place_name(city) and place_name(province) in {place_name(part) for part in parts[4:]}:
-            candidates.add((parts[0], parts[2]))
+        region = {place_name(part) for part in parts[4:]}
+        if place_name(parts[2]) != place_name(city) or place_name(province) not in region:
+            continue
+        if parent_code:
+            prefix = parent_code[:5] if place_name(province) in {'北京', '天津', '上海', '重庆'} else parent_code[:7]
+            if not parts[0].startswith(prefix):
+                continue
+        candidates.add((parts[0], parts[2]))
     if len(candidates) != 1:
         raise ValueError('City lookup ambiguous')
     return candidates.pop()
 
 
+def parse_ip138(text):
+    locations = []
+    for span in re.findall(r'<span\b[^>]*>(.*?)</span>', text, re.S | re.I):
+        value = unescape(re.sub(r'<[^>]+>', '', span)).strip()
+        if value.startswith(('来自：', '来自:')):
+            fields = re.sub(r'^来自[：:]\s*', '', value).split()
+            # Public page layout: country, province, city, optional district, ISP.
+            if len(fields) not in (4, 5) or fields[0] != '中国':
+                raise ValueError('Unsupported IP138 location')
+            names = fields[1:-1]
+            if any(not re.fullmatch(r'[\u3400-\u9fff·]{1,30}', name) for name in names):
+                raise ValueError('Invalid IP138 location')
+            locations.append((names[0], names[1], names[2] if len(names) == 3 else None))
+    if len(locations) != 1:
+        raise ValueError('IP138 location missing or ambiguous')
+    return locations[0]
+
+
+async def search_city(session, city, province, parent_code=None):
+    async with session.get(SEARCH_SOURCE, params={'cityname': place_name(city), 'callback': 'weather'}) as response:
+        response.raise_for_status()
+        return parse_city(await response.text(), city, province, parent_code)
+
+
 async def locate(session):
+    try:
+        # The IP138 homepage embeds this public page. No token or IP is stored.
+        async with session.get(IP138_SOURCE, headers={'Referer': 'https://www.ip138.com/'}, allow_redirects=False) as response:
+            if response.status != 200:
+                raise ValueError('IP138 page unavailable')
+            province, city, district = parse_ip138(await response.text())
+        city_result = await search_city(session, city, province)
+        if district:
+            try:
+                return await search_city(session, district, province, city_result[0])
+            except (ClientError, ValueError, KeyError, TypeError, OSError, asyncio.TimeoutError):
+                pass
+        return city_result
+    except (ClientError, ValueError, KeyError, TypeError, OSError, asyncio.TimeoutError):
+        pass
     async with session.get(LOCATION_SOURCE) as response:
         response.raise_for_status()
         data = await response.json(content_type=None)
     if data.get('ret') != 0 or not data.get('city') or not data.get('province'):
         raise ValueError('IP location unavailable')
-    city, province = data['city'], data['province']
-    # Never persist or return the provider's IP field.
-    async with session.get(SEARCH_SOURCE, params={'cityname': place_name(city), 'callback': 'weather'}) as response:
-        response.raise_for_status()
-        return parse_city(await response.text(), city, province)
+    return await search_city(session, data['city'], data['province'])
 
 
 def parse_details(html):
@@ -124,7 +167,7 @@ def register(app):
             try:
                 async with ClientSession(timeout=ClientTimeout(total=6), headers={
                         'Referer': 'https://www.weather.com.cn/', 'User-Agent': 'Mozilla/5.0'}) as session:
-                    city_id, name = await locate(session)
+                    city_id, name = await asyncio.wait_for(locate(session), timeout=12)
                     source = f'https://www.weather.com.cn/weather1d/{city_id}.shtml'
                     real_source = f'https://d1.weather.com.cn/sk_2d/{city_id}.html'
                     week_source = f'https://www.weather.com.cn/weather/{city_id}.shtml'
