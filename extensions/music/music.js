@@ -5,7 +5,7 @@
   const entry = document.createElement('button');
   entry.className = 'music-entry';
   entry.textContent = '♫ 音乐';
-  right.insertBefore(entry, right.firstChild);
+  right.insertBefore(entry, document.getElementById('link') || right.firstChild);
   const panel = document.createElement('dialog');
   panel.className = 'music-dialog';
   panel.setAttribute('aria-label', 'QQ 音乐账号验证');
@@ -28,6 +28,7 @@
   home.className = 'music-home';
   home.innerHTML = '<div class="music-home-heading"><span>QQ 音乐</span><button id="musicToChat">收起</button><button id="musicChoose">选歌</button></div><button class="music-art-toggle" aria-label="切换到歌词" aria-pressed="false"><div class="music-cover"><span aria-hidden="true">♫</span><img alt="专辑封面" hidden></div><div class="music-lyrics" aria-label="当前歌词"></div></button><div class="music-meta"><p id="musicArtist"></p><div class="music-player-slot"></div></div><div class="music-home-controls"><button id="musicPrevious" aria-label="上一首" title="上一首"></button><button id="musicToggle" aria-label="播放" title="播放"></button><button id="musicNext" aria-label="下一首" title="下一首"></button></div>';
   const side = document.querySelector('.main > .side');
+  home.querySelector('.music-home-heading').appendChild(home.querySelector('#musicToChat'));
   if (side) side.appendChild(home);
   home.querySelector('.music-player-slot').appendChild(panel.querySelector('.music-player'));
   const cover = home.querySelector('.music-cover img');
@@ -46,10 +47,26 @@
   home.querySelector('#musicNext').innerHTML = svgIcon('<rect x="17" y="4" width="3" height="16" rx="1"/><path d="m5 4 11 8-11 8z"/>');
   toggle.innerHTML = playIcon;
   const seek = home.querySelector('#musicSeek');
+  const elapsed = document.createElement('span');
+  elapsed.id = 'musicElapsed';
+  elapsed.textContent = '0:00';
+  const totalTime = document.createElement('span');
+  totalTime.id = 'musicDuration';
+  totalTime.textContent = '0:00';
+  const controls = home.querySelector('.music-home-controls');
+  controls.prepend(elapsed);
+  controls.appendChild(totalTime);
+  let expectedDuration = 0;
+  const clock = value => {
+    const seconds = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  };
   let draggingSeek = false;
   function updateSeek() {
     const duration = audio.duration;
     const usable = Number.isFinite(duration) && duration > 0;
+    elapsed.textContent = clock(draggingSeek ? Number(seek.value) : audio.currentTime);
+    totalTime.textContent = clock(usable ? duration : expectedDuration);
     seek.disabled = !usable;
     if (!usable) {
       seek.style.setProperty('--progress', '0%');
@@ -58,7 +75,6 @@
     seek.max = duration;
     if (!draggingSeek) seek.value = audio.currentTime;
     seek.style.setProperty('--progress', `${Math.min(100, Number(seek.value) / duration * 100)}%`);
-    const clock = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
     seek.setAttribute('aria-valuetext', `${clock(Number(seek.value))} / ${clock(duration)}`);
   }
   seek.addEventListener('pointerdown', () => {draggingSeek = true;});
@@ -71,7 +87,7 @@
       updateSeek();
     }
   });
-  for (const name of ['timeupdate', 'durationchange', 'loadedmetadata', 'emptied']) audio.addEventListener(name, updateSeek);
+  for (const name of ['timeupdate', 'durationchange', 'loadedmetadata', 'emptied', 'seeked']) audio.addEventListener(name, updateSeek);
   let lyricLines = [];
   let lyricIndex = -2;
   let queue = [];
@@ -80,11 +96,81 @@
   let queueTotal = 0;
   let queuePlaylist = null;
   let queueSource = 'playlist';
+  let queueTitle = '当前播放列表';
+  let currentMid = '';
+  let currentSong = null;
+  function updateEntry(playing) {
+    entry.replaceChildren();
+    entry.classList.toggle('is-playing', playing && Boolean(currentSong));
+    if (!playing || !currentSong) {
+      entry.textContent = '♫ 音乐';
+      entry.setAttribute('aria-label', '音乐');
+      entry.removeAttribute('title');
+      return;
+    }
+    const label = `♫ 正在播放 · ${currentSong.singer ? `${currentSong.singer} · ` : ''}${currentSong.title}`;
+    entry.setAttribute('aria-label', label);
+    entry.title = label;
+    const scroll = document.createElement('span');
+    scroll.className = 'music-entry-scroll';
+    scroll.setAttribute('aria-hidden', 'true');
+    for (let index = 0; index < 2; index++) {
+      const text = document.createElement('span');
+      text.textContent = label;
+      scroll.appendChild(text);
+    }
+    entry.appendChild(scroll);
+  }
+  const queueView = document.createElement('section');
+  queueView.id = 'musicQueue';
+  queueView.hidden = true;
+  const queueHeading = document.createElement('h3');
+  const queueSongs = document.createElement('div');
+  queueView.append(queueHeading, queueSongs);
+  panel.querySelector('#musicLists').before(queueView);
+  const queueButton = document.createElement('button');
+  queueButton.textContent = '当前播放列表';
+  panel.querySelector('.music-actions').appendChild(queueButton);
+  function renderQueue() {
+    queueHeading.textContent = queue.length
+      ? `${queueTitle} · ${queueTotal} 首${queueSource === 'playlist' ? ` · 当前第 ${queuePage} 页` : ''}`
+      : '当前没有播放列表';
+    queueSongs.replaceChildren();
+    queue.forEach((song, index) => {
+      const row = document.createElement('button');
+      row.className = 'music-song music-queue-song';
+      const current = song.mid === currentMid;
+      row.classList.toggle('is-current', current);
+      if (current) row.setAttribute('aria-current', 'true');
+      row.textContent = `${current ? '正在播放 · ' : `${index + 1}. `}${song.title} · ${song.singer || ''}`;
+      row.addEventListener('click', () => { queueIndex = index; play(song); });
+      queueSongs.appendChild(row);
+    });
+  }
+  function showQueue() {
+    renderQueue();
+    queueView.hidden = false;
+    panel.querySelector('#musicLists').hidden = true;
+    panel.querySelector('#musicSongs').hidden = true;
+    previous.hidden = true;
+    next.hidden = true;
+    if (!panel.open) panel.showModal();
+  }
+  function showBrowser() {
+    queueView.hidden = true;
+    panel.querySelector('#musicLists').hidden = false;
+    panel.querySelector('#musicSongs').hidden = false;
+  }
+  queueButton.addEventListener('click', showQueue);
   let handlingCommand = false;
   const commandResults = new Map();
   cover.addEventListener('error', () => {cover.hidden = true;});
   home.querySelector('#musicToChat').addEventListener('click', () => document.body.classList.remove('music-mode'));
-  home.querySelector('#musicChoose').addEventListener('click', () => {if (!panel.open) panel.showModal();});
+  home.querySelector('#musicChoose').textContent = '播放列表';
+  home.querySelector('#musicChoose').addEventListener('click', () => {
+    if (queue.length) showQueue();
+    else if (!panel.open) panel.showModal();
+  });
   home.querySelector('#musicPrevious').addEventListener('click', () => stepMusic(-1).catch(error => {track.textContent = error.message;}));
   home.querySelector('#musicNext').addEventListener('click', () => stepMusic(1).catch(error => {track.textContent = error.message;}));
   toggle.addEventListener('click', () => {
@@ -95,13 +181,13 @@
     toggle.innerHTML = pauseIcon;
     toggle.setAttribute('aria-label', '暂停');
     toggle.title = '暂停';
-    entry.textContent = '♫ 正在播放';
+    updateEntry(true);
   });
   audio.addEventListener('pause', () => {
     toggle.innerHTML = playIcon;
     toggle.setAttribute('aria-label', '播放');
     toggle.title = '播放';
-    entry.textContent = '♫ 音乐';
+    updateEntry(false);
   });
   function updateLyrics() {
     if (!lyricLines.length) return;
@@ -160,14 +246,21 @@
   panel.querySelector('#wxLogin').addEventListener('click', () => login('wx'));
   async function play(song) {
     const request = ++playRequest;
+    renderQueue();
     status.textContent = '正在获取歌曲播放地址';
     audio.pause();
     try {
       const data = await call('/api/play', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mid: song.mid})});
       if (request !== playRequest) return;
       track.textContent = `${data.title} · ${data.quality}`;
+      expectedDuration = Number(data.duration || song.duration) || 0;
       audio.src = data.url;
+      updateSeek();
+      currentSong = {title: data.title || song.title, singer: data.singer || song.singer || ''};
       await audio.play();
+      if (request !== playRequest) return;
+      currentMid = song.mid;
+      renderQueue();
       document.body.classList.add('music-mode');
       if (panel.open) panel.close();
       home.querySelector('#musicArtist').textContent = data.singer || '';
@@ -202,6 +295,7 @@
     status.textContent = '正在读取歌曲';
     try {
       const data = await call(`/api/songs?id=${playlist.id}&dirid=${playlist.dirid}&page=${targetPage}`);
+      showBrowser();
       page = targetPage;
       const list = panel.querySelector('#musicSongs');
       list.replaceChildren();
@@ -211,6 +305,7 @@
         row.textContent = `${song.title} · ${song.singer}  ${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, '0')}`;
         row.addEventListener('click', () => {
           queueSource = 'playlist';
+          queueTitle = playlist.title;
           queue = data.songs;
           queueIndex = index;
           queuePage = targetPage;
@@ -235,6 +330,7 @@
     const data = await call(`/api/songs?id=${selected.id}&dirid=${selected.dirid}&page=1`);
     if (!data.songs.length) throw new Error('歌单里还没有歌曲');
     queuePlaylist = selected;
+    queueTitle = selected.title;
     queueSource = 'playlist';
     queue = data.songs;
     queuePage = 1;
@@ -255,6 +351,7 @@
     }
     if (!selected.length) throw new Error('暂时没有获取到歌曲');
     queueSource = 'feed';
+    queueTitle = kind === 'shuffle' ? `随机播放 · ${data.title}` : data.title;
     queue = selected;
     queuePlaylist = null;
     queuePage = 1;
@@ -299,6 +396,7 @@
     if (!result.songs.length) throw new Error('没有找到这首歌，请补充歌手或换个歌名');
     const select = async index => {
       queueSource = 'search';
+      queueTitle = `搜索 · ${command.query}`;
       queue = result.songs;
       queueIndex = index;
       queuePlaylist = null;
@@ -306,26 +404,11 @@
       queueTotal = queue.length;
       if (!await play(queue[index])) throw new Error('这首歌曲暂时无法播放，请选择其他版本');
     };
-    const index = result.songs.findIndex(item => item.mid === result.auto_mid);
-    if (index >= 0) {
-      await select(index);
-      return `正在播放${result.songs[index].singer}的${result.songs[index].title}`;
-    }
-    panel.querySelector('#musicLists').replaceChildren();
-    const list = panel.querySelector('#musicSongs');
-    list.replaceChildren();
-    result.songs.forEach((song, position) => {
-      const row = document.createElement('button');
-      row.className = 'music-song';
-      row.textContent = `${song.title} · ${song.singer}`;
-      row.addEventListener('click', () => select(position).catch(error => {status.textContent = error.message;}));
-      list.appendChild(row);
-    });
-    previous.hidden = true;
-    next.hidden = true;
-    status.textContent = `搜索“${command.query}”找到多个候选，请点选歌曲`;
-    if (!panel.open) panel.showModal();
-    return '找到多个候选版本，请在屏幕上选择歌曲';
+    const matched = result.songs.findIndex(item => item.mid === result.auto_mid);
+    const index = matched >= 0 ? matched : 0;
+    await select(index);
+    const notice = matched < 0 && result.songs.length > 1 ? '找到多首歌曲，先播放第一首。' : '';
+    return `${notice}正在播放${result.songs[index].singer}的${result.songs[index].title}`;
   }
   async function runCommand(action, command) {
     if (action === 'search') return searchMusic(command);
@@ -389,6 +472,10 @@
     status.textContent = '正在读取歌单';
     try {
       const data = await call('/api/playlists');
+      showBrowser();
+      panel.querySelector('#musicSongs').replaceChildren();
+      previous.hidden = true;
+      next.hidden = true;
       const list = panel.querySelector('#musicLists');
       list.replaceChildren();
       data.playlists.forEach(item => {

@@ -6,7 +6,7 @@
   card.className = 'weather-card';
   card.setAttribute('aria-label', '本地天气，点击展开详情');
   card.innerHTML = '<svg id="weatherIcon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg><span class="weather-place"><b>本地天气</b><small>中国天气网</small></span><span class="weather-values"><span id="weatherSummary">天气加载中</span><span id="weatherDetail">正在获取预报</span></span>';
-  right.insertBefore(card, document.getElementById('clock'));
+  right.insertBefore(card, right.querySelector('.music-entry') || document.getElementById('link') || document.getElementById('clock'));
   const box = document.getElementById('weather');
   const summary = document.getElementById('weatherSummary');
   const detail = document.getElementById('weatherDetail');
