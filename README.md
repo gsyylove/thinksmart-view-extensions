@@ -2,7 +2,7 @@
 
 为半格的 ThinkSmart View Ubuntu 镜像增加国内天气、QQ 音乐和本地语音指令。感谢半格、rickx 和 QQMusicApi 社区提供基础项目，本项目在这些工作的基础上增加独立扩展模块。
 
-截至 2026-11-08，已在两台 Lenovo ThinkSmart View CD-18781Y 上验证：Ubuntu 24.04 ARM64、半格系统层 **0.2.1**、客户端 **0.1.6**。此前使用客户端 0.1.3；本次通过上游官方在线更新升级，并恢复扩展挂接。系统层版本不是内核或 Ubuntu 发行版版本。本仓库提供扩展源码和安装脚本，不包含刷机镜像。
+截至 2026-11-13，已在两台 Lenovo ThinkSmart View CD-18781Y 上验证：Ubuntu 24.04 ARM64、半格系统层 **0.2.1**、客户端 **0.1.6**。此前使用客户端 0.1.3；本次通过上游官方在线更新升级，并恢复扩展挂接。系统层版本不是内核或 Ubuntu 发行版版本。本仓库提供扩展源码和安装脚本，不包含刷机镜像。
 
 本次变化见 [更新记录](CHANGELOG.md)，最终界面规格见 [音乐与天气界面说明](docs/MUSIC_UI_REQUIREMENTS.md)。
 
@@ -10,10 +10,10 @@
 
 | 组件 | 版本 |
 | --- | --- |
-| 音乐扩展 | **0.1.0** |
-| 天气扩展 | **0.1.0** |
+| 音乐扩展 | **0.1.1** |
+| 天气扩展 | **0.1.1** |
 
-联合发布标签为 `m0.1.0-w0.1.0`，见 [GitHub Release](https://github.com/gsyylove/thinksmart-view-extensions/releases/tag/m0.1.0-w0.1.0)。两个组件可单独安装、独立递增版本，规则见[版本方案](docs/VERSIONING.md)。上游客户端 0.1.6、系统层 0.2.1 是兼容环境版本。
+联合发布标签为 `m0.1.1-w0.1.1`，见 [GitHub Release](https://github.com/gsyylove/thinksmart-view-extensions/releases/tag/m0.1.1-w0.1.1)。两个组件可单独安装、独立递增版本，规则见[版本方案](docs/VERSIONING.md)。上游客户端 0.1.6、系统层 0.2.1 是兼容环境版本。
 
 ## 当前功能
 
@@ -82,15 +82,9 @@ git pull --ff-only
 bash install.sh all
 ```
 
-更新半格官方客户端或网关前，先移除挂接；官方更新完成后再装回模块：
+运行时加载器通过独立的 systemd 配置启用。迁移旧安装时，安装器先还原原先写入官方文件的挂接。之后可从官方设置页检查和安装更新。加载器只为已验证的上游文件启用扩展。页面或客户端后端改变时，主页使用官方实现。网关语音入口改变时，语音分流使用官方实现。扩展兼容新版本后可重新启用对应挂接。
 
-```bash
-bash uninstall.sh all
-# 此时执行半格官方更新
-bash install.sh all
-```
-
-可将 `all` 换为 `weather` 或 `music`。移除操作保留模块文件、账号数据和备份；不会自动清理账号登录。备份在设备 `/home/ubuntu/thinksmart-backups`，并非整机备份。官方页面或语音入口结构变化时，挂接脚本会停止，需要检查兼容性。
+使用 `bash uninstall.sh all` 移除挂接，也可选择 `weather` 或 `music`。移除后可从设备上的 `/home/ubuntu/thinksmart-backups` 找到旧版迁移备份。
 
 ## 外部依赖与数据
 

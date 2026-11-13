@@ -30,7 +30,6 @@ if [[ "$target" == all || "$target" == music ]]; then
     sudo install -m 644 "$root/extensions/music/$file" "/opt/thinksmart/extensions/music/$file"
   done
   sudo install -m 644 "$root/extensions/music/thinksmart-music.service" /etc/systemd/system/thinksmart-music.service
-  sudo python3 /opt/thinksmart/extensions/music/install.py
   sudo systemctl daemon-reload
   sudo systemctl enable thinksmart-music
   sudo systemctl restart thinksmart-music
@@ -41,8 +40,38 @@ if [[ "$target" == all || "$target" == weather ]]; then
   for file in backend.py voice.py weather.js weather.css install.py README.md; do
     sudo install -m 644 "$root/extensions/weather/$file" "/opt/thinksmart/extensions/weather/$file"
   done
-  sudo python3 /opt/thinksmart/extensions/weather/install.py
 fi
+
+# Restore files touched by earlier releases before enabling the runtime loader.
+legacy_music=false
+legacy_weather=false
+if grep -q '<!-- local-music -->' "$client/web/v2/index.html"; then
+  sudo python3 /opt/thinksmart/extensions/music/install.py --remove
+  legacy_music=true
+fi
+if grep -q '<!-- local-weather -->' "$client/web/v2/index.html"; then
+  sudo python3 /opt/thinksmart/extensions/weather/install.py --remove
+  legacy_weather=true
+fi
+
+runtime=/opt/thinksmart/extensions/runtime
+sudo install -d "$runtime" /etc/systemd/system/thinksmart-client.service.d
+sudo install -m 644 "$root/runtime/sitecustomize.py" "$runtime/sitecustomize.py"
+if [[ "$target" == all || "$target" == music || "$legacy_music" == true ]]; then
+  sudo touch "$runtime/music.enabled"
+fi
+if [[ "$target" == all || "$target" == weather || "$legacy_weather" == true ]]; then
+  sudo touch "$runtime/weather.enabled"
+fi
+for unit in thinksmart-client xiaozhi-hub; do
+  if [[ "$unit" == thinksmart-client ]]; then scope=system; else scope=user; fi
+  dropin="/etc/systemd/$scope/$unit.service.d"
+  sudo install -d "$dropin"
+  printf '[Service]\nEnvironment=PYTHONPATH=%s\nEnvironment=PYTHONDONTWRITEBYTECODE=1\n' "$runtime" |
+    sudo tee "$dropin/thinksmart-extensions.conf" >/dev/null
+done
+sudo systemctl daemon-reload
+systemctl --user daemon-reload
 
 systemctl --user restart xiaozhi-hub
 sudo systemctl restart thinksmart-client

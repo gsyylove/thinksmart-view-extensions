@@ -1,6 +1,6 @@
 # QQ 音乐模块
 
-音乐扩展版本：**0.1.0**。与天气 0.1.0 联合发布，标签 `m0.1.0-w0.1.0`。
+音乐扩展版本：**0.1.1**。与天气 0.1.1 联合发布，标签 `m0.1.1-w0.1.1`。
 
 在半格 ThinkSmart View 首页嵌入音乐播放，通过本地规则处理音乐语音指令。完整安装见[项目首页](../../README.md)，来源、许可和服务链接见[第三方说明](../../THIRD_PARTY.md)。
 
@@ -52,9 +52,10 @@
 bash install.sh music
 ```
 
-脚本安装依赖、复制模块、备份并添加页面／网关挂接，启动音乐服务后重启网关和客户端。官方网关更新前先运行 `bash uninstall.sh music`，更新完成后再运行上述安装命令。移除挂接保留账号数据。
+模块位于 `/opt/thinksmart/extensions/music`。安装器迁移旧挂接后，由 systemd 配置启用运行时加载器。可直接使用官方设置页检查更新。上游文件摘要变化时，对应入口回到官方实现，待扩展适配后恢复。
 
-服务状态可用 `systemctl status thinksmart-music` 查看。备份在 `/home/ubuntu/thinksmart-backups`。页面入口、服务安装脚本和语音分流分别位于 `music.js`、`install.py`、`voice.py`；网关挂接点为 `core/handle/receiveAudioHandle.py`。上游入口变化时安装脚本会停止，需检查兼容性。
+使用 `bash uninstall.sh music` 可关闭此模块。旧版迁移备份位于 `/home/ubuntu/thinksmart-backups`。
+
 
 ## 验证与限制
 

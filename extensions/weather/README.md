@@ -1,6 +1,6 @@
 # 本地天气模块
 
-天气扩展版本：**0.1.0**。与音乐 0.1.0 联合发布，标签 `m0.1.0-w0.1.0`。
+天气扩展版本：**0.1.1**。与音乐 0.1.1 联合发布，标签 `m0.1.1-w0.1.1`。
 
 在首页顶栏音乐入口前显示天气图标、当前温度、天气和今日高低温；点击展开详情，上排每 3 小时预报，下排七天预报。卡片高度 52px、圆角 17px，沿用主题蓝灰底白字，与原系统设置按钮垂直对齐；原系统待机和设置不改动。界面提供刷新和关闭按钮，并隐藏原右上角小时间。完整安装见[项目首页](../../README.md)，来源与服务链接见[第三方说明](../../THIRD_PARTY.md)。
 
@@ -37,8 +37,8 @@
 bash install.sh weather
 ```
 
-模块安装在 `/opt/thinksmart/extensions/weather`，`install.py` 挂接页面、客户端数据路由和网关语音入口。当前依赖客户端和网关已有的 aiohttp。官方组件更新前先运行 `bash uninstall.sh weather`，更新后再运行安装命令。
+模块位于 `/opt/thinksmart/extensions/weather`。安装器迁移旧挂接后，由 systemd 配置启用运行时加载器。可直接使用官方设置页检查更新。上游文件摘要变化时，对应入口回到官方实现，待扩展适配后恢复。
 
-备份在 `/home/ubuntu/thinksmart-backups`。`backend.py` 负责定位与预报解析，`voice.py` 负责本地语音分流，`weather.js`／`weather.css` 负责界面。安装脚本会读取客户端 `current` 所指版本并核对挂接位置；结构变化时停止安装，需重新检查适配。
+使用 `bash uninstall.sh weather` 可关闭此模块。旧版迁移备份位于 `/home/ubuntu/thinksmart-backups`。
 
-已在设备验证区县天气匹配、实况及小时／七天预报。定位解析、归属校验和后备路径测试见仓库 `tests/test_weather_location.py`；尚未覆盖所有省市区和海外出口。
+已验证区县匹配、实况和小时／七天预报。定位测试见 tests/test_weather_location.py。

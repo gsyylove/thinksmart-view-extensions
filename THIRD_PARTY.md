@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | [rickx/ubuntu-thinksmart](https://github.com/rickx/ubuntu-thinksmart) | ThinkSmart View Ubuntu 适配、驱动和刷机基础，半格镜像的上游 | 间接基础；本仓库不打包其镜像 |
 | [justhalfbit/thinksmart-ubuntu-image](https://github.com/justhalfbit/thinksmart-ubuntu-image) | 本扩展运行所需的半格系统镜像 | 用户先单独安装 |
-| [justhalfbit/xiaozhi-thinksmart-client](https://github.com/justhalfbit/xiaozhi-thinksmart-client) | 首页、唤醒检测、音频上传与播放、页面状态 | 安装脚本给官方首页和天气数据路由添加挂接 |
+| [justhalfbit/xiaozhi-thinksmart-client](https://github.com/justhalfbit/xiaozhi-thinksmart-client) | 首页、唤醒检测、音频上传与播放、页面状态 | 运行时加载器在内存中挂接首页和天气路由 |
 | [justhalfbit/xiaozhi-hub-server](https://github.com/justhalfbit/xiaozhi-hub-server) | 语音识别与合成、模型路由、固定语音回复 | 在识别文字后、模型意图分析前挂接本地指令；音乐使用原有回复后结束会话机制 |
 
 这些项目需按各自仓库说明安装、更新并遵循其许可。安装路径与入口结构会影响兼容性。本项目不替换它们的维护职责。
@@ -53,3 +53,5 @@ IP138 的公开组件含年份，跨年或页面改版后可能需要更新入�
 ## 许可与归属
 
 本项目源码采用 [GPL-3.0](LICENSE)。上游项目、依赖包和第三方数据遵循各自许可或服务条件。修改或再分发时请保留适用的版权与许可声明，并检查所分发版本的要求。致谢和链接用于说明来源，不表示上游作者或平台参与维护本扩展或为其背书。
+
+运行时挂接和上游文件摘要校验思路参考 [fubin0478/thinksmart-view](https://github.com/fubin0478/thinksmart-view)。
